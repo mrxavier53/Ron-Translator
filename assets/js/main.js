@@ -35,35 +35,38 @@ let currentMode = "eng-to-ron";
 let translationHistory = JSON.parse(localStorage.getItem("ronHistory") || "[]");
 
 let audioContext = null;
-let runeSoundsEnabled = localStorage.getItem("ronRuneSounds") !== "off";
 
-let typingTimer;
-let ronTypingTimer;
-let lastTypingSoundTime = 0;
-let lastRuneSoundTime = 0;
+let englishTranslationTimer = null;
+let ronTranslationTimer = null;
+
+/* 20 milliseconds automatic translate delay */
+const TRANSLATION_DELAY = 20;
+
+/* 20 milliseconds between each rune appearing */
+const RUNE_REVEAL_DELAY = 20;
 
 /* ─────────────────────────────────────────────
-   TRANSLATION FUNCTIONS
+   TRANSLATION
 ───────────────────────────────────────────── */
 
 function translateToRon(text) {
     return text
         .toLowerCase()
         .split("")
-        .map((char) => RON_RUNE_MAP[char] || char)
+        .map((character) => RON_RUNE_MAP[character] || character)
         .join("");
 }
 
 function translateToEnglish(text) {
     return text
         .split("")
-        .map((char) => REVERSE_RUNE_MAP[char] || char)
+        .map((character) => REVERSE_RUNE_MAP[character] || character)
         .join("");
 }
 
 /* ─────────────────────────────────────────────
-   RON SOUND SYSTEM
-   No MP3 files needed.
+   SOUND SYSTEM
+   No MP3 or download needed.
 ───────────────────────────────────────────── */
 
 function initAudio() {
@@ -76,27 +79,20 @@ function initAudio() {
     }
 }
 
-function makeTone({
-    frequency = 600,
-    duration = 0.08,
-    volume = 0.08,
-    type = "sine",
-    slideTo = null
-} = {}) {
-    if (!runeSoundsEnabled) return;
-
+function makeTone(frequency, duration, volume, type, slideTo) {
     initAudio();
 
     if (!audioContext) return;
 
+    const now = audioContext.currentTime;
+
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
-    const now = audioContext.currentTime;
 
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, now);
 
-    if (slideTo !== null) {
+    if (slideTo) {
         oscillator.frequency.exponentialRampToValueAtTime(
             Math.max(slideTo, 1),
             now + duration
@@ -104,6 +100,7 @@ function makeTone({
     }
 
     gainNode.gain.setValueAtTime(volume, now);
+
     gainNode.gain.exponentialRampToValueAtTime(
         0.00001,
         now + duration
@@ -116,110 +113,81 @@ function makeTone({
     oscillator.stop(now + duration);
 }
 
-/* Soft sound while user types in either text box */
-function playTypingSound() {
-    if (!runeSoundsEnabled) return;
+/* Runs immediately on every typed character */
+function playTypingSound(event) {
+    if (!event) return;
 
-    const now = Date.now();
+    if (event.inputType && event.inputType.startsWith("delete")) {
+        return;
+    }
 
-    // Prevents hundreds of sounds during fast typing.
-    if (now - lastTypingSoundTime < 65) return;
-    lastTypingSoundTime = now;
+    if (event.isComposing) return;
 
-    makeTone({
-        frequency: 260 + Math.random() * 80,
-        duration: 0.035,
-        volume: 0.025,
-        type: "triangle",
-        slideTo: 210
-    });
+    makeTone(
+        280 + Math.random() * 55,
+        0.028,
+        0.025,
+        "triangle",
+        215
+    );
 }
 
-/* Magical click while translated letters/runes appear */
+/* Rune sound while translated letters appear */
 function playStoneClick() {
-    if (!runeSoundsEnabled) return;
-
-    const now = Date.now();
-
-    // Keeps long translations from becoming noisy.
-    if (now - lastRuneSoundTime < 45) return;
-    lastRuneSoundTime = now;
-
-    makeTone({
-        frequency: 600 + Math.random() * 200,
-        duration: 0.08,
-        volume: 0.08,
-        type: "sine",
-        slideTo: 460
-    });
+    makeTone(
+        600 + Math.random() * 200,
+        0.075,
+        0.07,
+        "sine",
+        460
+    );
 }
 
-/* Final magical sound after translation is fully shown */
+/* Sound after the complete translation is shown */
 function playTranslationCompleteSound() {
-    if (!runeSoundsEnabled) return;
+    makeTone(520, 0.14, 0.06, "sine", 730);
 
-    makeTone({
-        frequency: 520,
-        duration: 0.16,
-        volume: 0.07,
-        type: "sine",
-        slideTo: 740
-    });
-
-    setTimeout(() => {
-        makeTone({
-            frequency: 780,
-            duration: 0.22,
-            volume: 0.06,
-            type: "sine",
-            slideTo: 980
-        });
-    }, 90);
+    window.setTimeout(() => {
+        makeTone(780, 0.20, 0.05, "sine", 970);
+    }, 85);
 }
 
-/* Shows text slowly with rune sounds */
+/* ─────────────────────────────────────────────
+   RUNE REVEAL EFFECT
+───────────────────────────────────────────── */
+
 function typewriterEffect(element, text) {
     if (element._ronTypingTimer) {
         clearTimeout(element._ronTypingTimer);
     }
 
     element.textContent = "";
-    let i = 0;
 
-    function addChar() {
-        if (i >= text.length) {
+    let index = 0;
+
+    function revealNextCharacter() {
+        if (index >= text.length) {
             playTranslationCompleteSound();
             return;
         }
 
-        const character = text.charAt(i);
+        const character = text.charAt(index);
+
         element.textContent += character;
 
-        if (character.trim() !== "") {
+        if (character.trim()) {
             playStoneClick();
         }
 
-        i += 1;
+        index += 1;
 
-        element._ronTypingTimer = setTimeout(addChar, 18);
+        element._ronTypingTimer = setTimeout(
+            revealNextCharacter,
+            RUNE_REVEAL_DELAY
+        );
     }
 
-    addChar();
-}
-
-/* Plays typing sound only when user adds text, not deletes it */
-function handleInputTypingSound(event) {
-    const deleteActions = [
-        "deleteContentBackward",
-        "deleteContentForward",
-        "deleteByCut",
-        "deleteByDrag"
-    ];
-
-    if (deleteActions.includes(event.inputType)) return;
-    if (event.isComposing) return;
-
-    playTypingSound();
+    revealNextCharacter();
 }
 
 /* ─────────────────────────────────────────────
@@ -252,7 +220,16 @@ function saveToHistory(input, output, mode) {
     }
 
     localStorage.setItem("ronHistory", JSON.stringify(translationHistory));
+
     renderHistory();
+}
+
+function escapeHtml(text) {
+    const div = document.createElement("div");
+
+    div.textContent = text;
+
+    return div.innerHTML;
 }
 
 function renderHistory() {
@@ -260,77 +237,80 @@ function renderHistory() {
 
     if (!historyList) return;
 
-    if (translationHistory.length === 0) {
-        historyList.innerHTML = '<div class="empty-history">No translations yet</div>';
+    if (!translationHistory.length) {
+        historyList.innerHTML = `
+            <div class="empty-history">No translations yet</div>
+        `;
         return;
     }
 
     historyList.innerHTML = translationHistory
-        .map(
-            (item) => `
-            <div class="history-item" data-id="${item.id}">
-                <div class="history-text">${escapeHtml(item.input)}</div>
-                <div class="history-text" style="color: #00e5ff; font-size: 0.8em;">
-                    → ${escapeHtml(item.output)}
+        .map((item) => {
+            return `
+                <div class="history-item" data-id="${item.id}">
+                    <div class="history-text">
+                        ${escapeHtml(item.input)}
+                    </div>
+
+                    <div class="history-text" style="color: #00e5ff; font-size: 0.8em;">
+                        → ${escapeHtml(item.output)}
+                    </div>
+
+                    <div class="history-date">
+                        ${item.mode === "eng-to-ron" ? "📖→ᚱ" : "ᚱ→📖"} | ${item.date}
+                    </div>
                 </div>
-                <div class="history-date">
-                    ${item.mode === "eng-to-ron" ? "📖→ᚱ" : "ᚱ→📖"} | ${item.date}
-                </div>
-            </div>
-        `
-        )
+            `;
+        })
         .join("");
 
     document.querySelectorAll(".history-item").forEach((element) => {
         element.addEventListener("click", () => {
-            const id = Number(element.dataset.id);
-            const item = translationHistory.find((history) => history.id === id);
+            const item = translationHistory.find(
+                (entry) => entry.id === Number(element.dataset.id)
+            );
 
             if (!item) return;
 
             if (item.mode === "eng-to-ron") {
                 engToRonBtn.click();
+
                 inputArea.value = item.input;
                 charCountEng.textContent = `${item.input.length} characters`;
+
                 triggerTranslation();
             } else {
                 ronToEngBtn.click();
+
                 ronInputArea.value = item.input;
                 charCountRon.textContent = `${item.input.length} characters`;
+
                 triggerReverseTranslation();
             }
 
-            document.getElementById("history-sidebar").classList.remove("open");
+            document
+                .getElementById("history-sidebar")
+                .classList.remove("open");
         });
     });
 }
 
-function escapeHtml(text) {
-    const div = document.createElement("div");
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 function clearHistory() {
-    document.querySelectorAll(".history-item").forEach((item) => {
-        item.classList.add("fade-out");
-    });
+    translationHistory = [];
 
-    setTimeout(() => {
-        translationHistory = [];
-        localStorage.setItem("ronHistory", "[]");
-        renderHistory();
-    }, 300);
+    localStorage.setItem("ronHistory", "[]");
+
+    renderHistory();
 }
 
 /* ─────────────────────────────────────────────
-   TRANSLATION ACTIONS
+   AUTO TRANSLATION
 ───────────────────────────────────────────── */
 
 function triggerTranslation() {
     const text = inputArea.value;
 
-    if (text.trim() === "") {
+    if (!text.trim()) {
         outputDiv.textContent = "...";
         return;
     }
@@ -338,13 +318,14 @@ function triggerTranslation() {
     const translated = translateToRon(text);
 
     typewriterEffect(outputDiv, translated);
+
     saveToHistory(text, translated, "eng-to-ron");
 }
 
 function triggerReverseTranslation() {
     const text = ronInputArea.value;
 
-    if (text.trim() === "") {
+    if (!text.trim()) {
         englishOutputDiv.textContent = "...";
         return;
     }
@@ -352,6 +333,7 @@ function triggerReverseTranslation() {
     const translated = translateToEnglish(text);
 
     typewriterEffect(englishOutputDiv, translated);
+
     saveToHistory(text, translated, "ron-to-eng");
 }
 
@@ -370,10 +352,12 @@ async function translateFile(file, mode) {
     if (mode === "eng-to-ron") {
         inputArea.value = text;
         charCountEng.textContent = `${text.length} characters`;
+
         triggerTranslation();
     } else {
         ronInputArea.value = text;
         charCountRon.textContent = `${text.length} characters`;
+
         triggerReverseTranslation();
     }
 }
@@ -384,22 +368,25 @@ function setupDragAndDrop(zoneId, inputId, mode) {
 
     if (!zone || !fileInput) return;
 
-    const button = zone.querySelector(".file-btn");
+    const fileButton = zone.querySelector(".file-btn");
 
-    if (button) {
-        button.addEventListener("click", () => fileInput.click());
+    if (fileButton) {
+        fileButton.addEventListener("click", () => {
+            fileInput.click();
+        });
     }
 
-    fileInput.addEventListener("change", async (event) => {
+    fileInput.addEventListener("change", (event) => {
         const file = event.target.files[0];
 
         if (file) {
-            await translateFile(file, mode);
+            translateFile(file, mode);
         }
     });
 
     zone.addEventListener("dragover", (event) => {
         event.preventDefault();
+
         zone.classList.add("drag-over");
     });
 
@@ -407,33 +394,33 @@ function setupDragAndDrop(zoneId, inputId, mode) {
         zone.classList.remove("drag-over");
     });
 
-    zone.addEventListener("drop", async (event) => {
+    zone.addEventListener("drop", (event) => {
         event.preventDefault();
+
         zone.classList.remove("drag-over");
 
         const file = event.dataTransfer.files[0];
 
         if (file) {
-            await translateFile(file, mode);
+            translateFile(file, mode);
         }
     });
 }
 
 /* ─────────────────────────────────────────────
-   COPY + DOWNLOAD
+   COPY AND DOWNLOAD
 ───────────────────────────────────────────── */
 
 function downloadTranslation() {
-    let content;
-    let filename;
+    const content =
+        currentMode === "eng-to-ron"
+            ? outputDiv.textContent
+            : englishOutputDiv.textContent;
 
-    if (currentMode === "eng-to-ron") {
-        content = outputDiv.textContent;
-        filename = "ron_translation.txt";
-    } else {
-        content = englishOutputDiv.textContent;
-        filename = "english_translation.txt";
-    }
+    const filename =
+        currentMode === "eng-to-ron"
+            ? "ron_translation.txt"
+            : "english_translation.txt";
 
     if (!content || content === "...") return;
 
@@ -442,14 +429,17 @@ function downloadTranslation() {
     });
 
     const url = URL.createObjectURL(blob);
+
     const link = document.createElement("a");
 
     link.href = url;
     link.download = filename;
 
     document.body.appendChild(link);
+
     link.click();
-    document.body.removeChild(link);
+
+    link.remove();
 
     URL.revokeObjectURL(url);
 }
@@ -460,11 +450,13 @@ function showCopiedState(button) {
 
     copyIcon.textContent = "✓";
     copyText.textContent = "Copied!";
+
     button.classList.add("copied");
 
     setTimeout(() => {
         copyIcon.textContent = "📋";
         copyText.textContent = "Copy";
+
         button.classList.remove("copied");
     }, 2000);
 }
@@ -474,19 +466,21 @@ async function copyText(text, button) {
 
     try {
         await navigator.clipboard.writeText(text);
-        showCopiedState(button);
-    } catch (error) {
+    } catch {
         const textarea = document.createElement("textarea");
 
         textarea.value = text;
+
         document.body.appendChild(textarea);
+
         textarea.select();
 
         document.execCommand("copy");
-        document.body.removeChild(textarea);
 
-        showCopiedState(button);
+        textarea.remove();
     }
+
+    showCopiedState(button);
 }
 
 /* ─────────────────────────────────────────────
@@ -496,21 +490,25 @@ async function copyText(text, button) {
 function createParticles() {
     const particlesContainer = document.getElementById("particles");
 
-    const runes = [
-        "ᚱ", "ᛟ", "ᚾ", "ᚨ", "ᛒ",
-        "ᚲ", "ᛞ", "ᛖ", "ᚠ"
-    ];
-
     if (!particlesContainer) return;
+
+    const runes = [
+        "ᚱ", "ᛟ", "ᚾ",
+        "ᚨ", "ᛒ", "ᚲ",
+        "ᛞ", "ᛖ", "ᚠ"
+    ];
 
     for (let i = 0; i < 30; i += 1) {
         const particle = document.createElement("div");
 
         particle.classList.add("particle");
-        particle.textContent = runes[Math.floor(Math.random() * runes.length)];
+
+        particle.textContent =
+            runes[Math.floor(Math.random() * runes.length)];
 
         particle.style.left = `${Math.random() * 100}%`;
         particle.style.top = `${Math.random() * 100}%`;
+
         particle.style.animationDelay = `${Math.random() * 5}s`;
         particle.style.animationDuration = `${Math.random() * 10 + 10}s`;
 
@@ -527,38 +525,41 @@ function setupEvents() {
     const historySidebar = document.getElementById("history-sidebar");
     const clearHistoryBtn = document.getElementById("clear-history");
 
-    const downloadBtnEng = document.getElementById("download-btn-eng");
-    const downloadBtnRon = document.getElementById("download-btn-ron");
+    historyToggle?.addEventListener("click", () => {
+        historySidebar.classList.toggle("open");
+    });
 
-    if (historyToggle && historySidebar) {
-        historyToggle.addEventListener("click", () => {
-            historySidebar.classList.toggle("open");
-        });
+    document.addEventListener("click", (event) => {
+        if (
+            historySidebar &&
+            !historySidebar.contains(event.target) &&
+            event.target !== historyToggle
+        ) {
+            historySidebar.classList.remove("open");
+        }
+    });
 
-        document.addEventListener("click", (event) => {
-            if (
-                !historySidebar.contains(event.target) &&
-                event.target !== historyToggle
-            ) {
-                historySidebar.classList.remove("open");
-            }
-        });
-    }
+    clearHistoryBtn?.addEventListener("click", clearHistory);
 
-    if (clearHistoryBtn) {
-        clearHistoryBtn.addEventListener("click", clearHistory);
-    }
+    document
+        .getElementById("download-btn-eng")
+        ?.addEventListener("click", downloadTranslation);
 
-    if (downloadBtnEng) {
-        downloadBtnEng.addEventListener("click", downloadTranslation);
-    }
+    document
+        .getElementById("download-btn-ron")
+        ?.addEventListener("click", downloadTranslation);
 
-    if (downloadBtnRon) {
-        downloadBtnRon.addEventListener("click", downloadTranslation);
-    }
+    setupDragAndDrop(
+        "drop-zone-eng",
+        "file-input-eng",
+        "eng-to-ron"
+    );
 
-    setupDragAndDrop("drop-zone-eng", "file-input-eng", "eng-to-ron");
-    setupDragAndDrop("drop-zone-ron", "file-input-ron", "ron-to-eng");
+    setupDragAndDrop(
+        "drop-zone-ron",
+        "file-input-ron",
+        "ron-to-eng"
+    );
 
     engToRonBtn.addEventListener("click", () => {
         currentMode = "eng-to-ron";
@@ -573,32 +574,41 @@ function setupEvents() {
     ronToEngBtn.addEventListener("click", () => {
         currentMode = "ron-to-eng";
 
-        ronToEngBtn.classList.remove("active");
-        engToRonBtn.classList.remove("active");
         ronToEngBtn.classList.add("active");
+        engToRonBtn.classList.remove("active");
 
         ronToEngArea.classList.remove("hidden");
         engToRonArea.classList.add("hidden");
     });
 
     inputArea.addEventListener("input", (event) => {
-        handleInputTypingSound(event);
+        charCountEng.textContent = `${inputArea.value.length} characters`;
 
-        const text = inputArea.value;
-        charCountEng.textContent = `${text.length} characters`;
+        /* Sound happens instantly when a key is typed */
+        playTypingSound(event);
 
-        clearTimeout(typingTimer);
-        typingTimer = setTimeout(triggerTranslation, 300);
+        /* Translation begins after only 20ms */
+        clearTimeout(englishTranslationTimer);
+
+        englishTranslationTimer = setTimeout(
+            triggerTranslation,
+            TRANSLATION_DELAY
+        );
     });
 
     ronInputArea.addEventListener("input", (event) => {
-        handleInputTypingSound(event);
+        charCountRon.textContent = `${ronInputArea.value.length} characters`;
 
-        const text = ronInputArea.value;
-        charCountRon.textContent = `${text.length} characters`;
+        /* Sound happens instantly when a key is typed */
+        playTypingSound(event);
 
-        clearTimeout(ronTypingTimer);
-        ronTypingTimer = setTimeout(triggerReverseTranslation, 300);
+        /* Translation begins after only 20ms */
+        clearTimeout(ronTranslationTimer);
+
+        ronTranslationTimer = setTimeout(
+            triggerReverseTranslation,
+            TRANSLATION_DELAY
+        );
     });
 
     copyBtnEng.addEventListener("click", () => {
@@ -609,9 +619,13 @@ function setupEvents() {
         copyText(englishOutputDiv.textContent, copyBtnRon);
     });
 
-    // Unlocks audio after the user's first real touch or keypress.
-    document.addEventListener("pointerdown", initAudio, { once: true });
-    document.addEventListener("keydown", initAudio, { once: true });
+    document.addEventListener("pointerdown", initAudio, {
+        once: true
+    });
+
+    document.addEventListener("keydown", initAudio, {
+        once: true
+    });
 }
 
 /* ─────────────────────────────────────────────
@@ -620,14 +634,19 @@ function setupEvents() {
 
 function registerServiceWorker() {
     if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("service-worker.js").catch((error) => {
-            console.warn("Service worker registration failed:", error);
-        });
+        navigator.serviceWorker
+            .register("service-worker.js")
+            .catch((error) => {
+                console.warn(
+                    "Service worker registration failed:",
+                    error
+                );
+            });
     }
 }
 
 /* ─────────────────────────────────────────────
-   START APP
+   START
 ───────────────────────────────────────────── */
 
 window.addEventListener("load", () => {
