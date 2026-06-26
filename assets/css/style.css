@@ -839,88 +839,125 @@ body.history-open .history-toggle {
     }
 }
 
+
 /* ─────────────────────────────────────────────
-   MOVING UPWARD RUNE EFFECTS
+   EXTRA-VISIBLE MOVING UPWARD RUNE EFFECTS
 ───────────────────────────────────────────── */
+
 body::before,
 body::after {
     content: "";
     position: fixed;
-    inset: auto;
-    width: 34rem;
-    height: 34rem;
+    width: 42rem;
+    height: 42rem;
     border-radius: 50%;
     pointer-events: none;
-    z-index: 0;
-    filter: blur(42px);
-    opacity: 0.34;
-    animation: ambientGlowDrift 14s ease-in-out infinite alternate;
+    z-index: 1;
+    filter: blur(48px);
+    opacity: 0.46;
+    animation: ambientGlowDrift 11s ease-in-out infinite alternate;
 }
 
 body::before {
-    top: -12rem;
-    left: -10rem;
-    background: radial-gradient(circle, rgba(0, 229, 255, 0.60) 0%, rgba(0, 229, 255, 0.18) 34%, transparent 70%);
+    top: -15rem;
+    left: -13rem;
+    background: radial-gradient(
+        circle,
+        rgba(0, 229, 255, 0.78) 0%,
+        rgba(0, 229, 255, 0.24) 40%,
+        transparent 72%
+    );
 }
 
 body::after {
-    right: -12rem;
-    bottom: -14rem;
-    background: radial-gradient(circle, rgba(99, 102, 241, 0.52) 0%, rgba(0, 229, 255, 0.15) 38%, transparent 70%);
-    animation-delay: -7s;
+    right: -14rem;
+    bottom: -16rem;
+    background: radial-gradient(
+        circle,
+        rgba(119, 94, 255, 0.68) 0%,
+        rgba(0, 229, 255, 0.22) 42%,
+        transparent 72%
+    );
+    animation-delay: -5.5s;
 }
 
 @keyframes ambientGlowDrift {
-    0% {
+    from {
         transform: translate3d(0, 0, 0) scale(1);
-        opacity: 0.26;
+        opacity: 0.34;
     }
-    100% {
-        transform: translate3d(7rem, 4rem, 0) scale(1.18);
-        opacity: 0.44;
+
+    to {
+        transform: translate3d(8rem, 5rem, 0) scale(1.22);
+        opacity: 0.56;
     }
 }
 
+/* Put the effects above the plain background, but behind the app card. */
 .particles {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
     overflow: hidden;
+    pointer-events: none;
 }
 
 .particle {
-    font-size: clamp(1.35rem, 2.2vw, 2.2rem);
-    color: rgba(0, 229, 255, 0.62);
+    position: absolute;
+    display: block;
+    font-size: clamp(1.65rem, 3vw, 3.1rem);
+    font-weight: 800;
+    color: rgba(0, 245, 255, 0.94);
     text-shadow:
-        0 0 8px rgba(0, 229, 255, 0.95),
-        0 0 22px rgba(0, 229, 255, 0.58),
-        0 0 44px rgba(93, 89, 255, 0.34);
-    filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.65));
+        0 0 7px rgba(255, 255, 255, 0.92),
+        0 0 18px rgba(0, 229, 255, 1),
+        0 0 42px rgba(0, 229, 255, 0.92),
+        0 0 76px rgba(111, 83, 255, 0.78);
+    filter: drop-shadow(0 0 12px rgba(0, 229, 255, 0.96));
+    opacity: 0;
     will-change: transform, opacity;
+    animation-name: particleFloat;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
 }
 
 @keyframes particleFloat {
     0% {
-        transform: translate3d(0, 0, 0) rotate(var(--start-rotate, 0deg)) scale(calc(var(--particle-scale, 1) * 0.84));
+        transform:
+            translate3d(0, 0, 0)
+            rotate(var(--start-rotate, 0deg))
+            scale(calc(var(--particle-scale, 1) * 0.8));
         opacity: 0;
     }
-    9% {
-        opacity: 0.62;
-    }
-    52% {
-        opacity: 0.94;
-    }
-    90% {
-        opacity: 0.66;
-    }
+
+    6% { opacity: 0.76; }
+    20% { opacity: 1; }
+    72% { opacity: 1; }
+    93% { opacity: 0.72; }
+
     100% {
-        transform: translate3d(var(--drift-x, 4vw), -150vh, 0) rotate(var(--end-rotate, 540deg)) scale(calc(var(--particle-scale, 1) * 1.18));
+        transform:
+            translate3d(var(--drift-x, 4vw), -155vh, 0)
+            rotate(var(--end-rotate, 720deg))
+            scale(calc(var(--particle-scale, 1) * 1.22));
         opacity: 0;
     }
 }
 
+/* Keep the readable content above the bright effects. */
 .translator-container {
+    position: relative;
+    z-index: 3;
     box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.80),
-        0 0 48px rgba(0, 229, 255, 0.20),
-        0 0 120px rgba(67, 56, 202, 0.16);
+        0 20px 60px rgba(0, 0, 0, 0.82),
+        0 0 56px rgba(0, 229, 255, 0.26),
+        0 0 130px rgba(67, 56, 202, 0.24);
+}
+
+@media (max-width: 650px) {
+    .particle {
+        font-size: clamp(1.45rem, 6vw, 2.35rem);
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
