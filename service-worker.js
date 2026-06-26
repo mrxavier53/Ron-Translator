@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ron-translator-v-music-track-history-bright-bg-2';
+const CACHE_NAME = 'ron-translator-v13';
 const FILES_TO_CACHE = [
   './',
   './index.html',
