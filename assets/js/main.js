@@ -67,6 +67,9 @@ function initAudio() {
 }
 
 function makeTone({ frequency, duration, volume, type = 'sine', slideTo = null }) {
+    // The Music toggle controls ALL sound: background music + typing + rune effects.
+    if (!musicEnabled) return;
+
     initAudio();
     if (!audioContext) return;
 
@@ -422,14 +425,23 @@ function createParticles() {
 
     if (!particlesContainer) return;
 
-    for (let i = 0; i < 30; i++) {
+    // Starts runes below the screen, then sends them upward with random tilted/upside-down rotation.
+    for (let i = 0; i < 38; i++) {
         const particle = document.createElement('div');
+        const startRotation = Math.floor(Math.random() * 360);
+        const extraRotation = 360 + Math.floor(Math.random() * 720);
+
         particle.classList.add('particle');
         particle.textContent = runes[Math.floor(Math.random() * runes.length)];
-        particle.style.left = Math.random() * 100 + '%';
-        particle.style.top = Math.random() * 100 + '%';
-        particle.style.animationDelay = Math.random() * 5 + 's';
-        particle.style.animationDuration = Math.random() * 10 + 10 + 's';
+        particle.style.left = `${Math.random() * 100}%`;
+        particle.style.top = `${100 + Math.random() * 35}%`;
+        particle.style.setProperty('--start-rotate', `${startRotation}deg`);
+        particle.style.setProperty('--end-rotate', `${startRotation + extraRotation}deg`);
+        particle.style.setProperty('--drift-x', `${-7 + Math.random() * 14}vw`);
+        particle.style.setProperty('--particle-scale', `${0.72 + Math.random() * 0.9}`);
+        particle.style.animationDelay = `${-Math.random() * 24}s`;
+        particle.style.animationDuration = `${14 + Math.random() * 14}s`;
+
         particlesContainer.appendChild(particle);
     }
 }
