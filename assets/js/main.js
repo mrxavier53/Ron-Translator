@@ -421,26 +421,37 @@ function setupDragAndDrop(zoneId, inputId, mode) {
 
 function createParticles() {
     const particlesContainer = document.getElementById('particles');
-    const runes = ['ᚱ', 'ᛟ', 'ᚾ', 'ᚨ', 'ᛒ', 'ᚲ', 'ᛞ', 'ᛖ', 'ᚠ'];
+
+    const runes = [
+        'ᚱ', 'ᛟ', 'ᚾ',
+        'ᚨ', 'ᛒ', 'ᚲ',
+        'ᛞ', 'ᛖ', 'ᚠ',
+        'ᚷ', 'ᚺ', 'ᛁ',
+        'ᛗ', 'ᛋ', 'ᛏ'
+    ];
 
     if (!particlesContainer) return;
 
-    // Starts runes below the screen, then sends them upward with random tilted/upside-down rotation.
-    for (let i = 0; i < 38; i++) {
+    // More particles, spread across the screen, moving upward continuously.
+    for (let i = 0; i < 68; i++) {
         const particle = document.createElement('div');
         const startRotation = Math.floor(Math.random() * 360);
-        const extraRotation = 360 + Math.floor(Math.random() * 720);
+        const extraRotation = 360 + Math.floor(Math.random() * 900);
 
         particle.classList.add('particle');
         particle.textContent = runes[Math.floor(Math.random() * runes.length)];
+
         particle.style.left = `${Math.random() * 100}%`;
-        particle.style.top = `${100 + Math.random() * 35}%`;
+        particle.style.top = `${18 + Math.random() * 120}%`;
+
         particle.style.setProperty('--start-rotate', `${startRotation}deg`);
         particle.style.setProperty('--end-rotate', `${startRotation + extraRotation}deg`);
-        particle.style.setProperty('--drift-x', `${-7 + Math.random() * 14}vw`);
-        particle.style.setProperty('--particle-scale', `${0.72 + Math.random() * 0.9}`);
-        particle.style.animationDelay = `${-Math.random() * 24}s`;
-        particle.style.animationDuration = `${14 + Math.random() * 14}s`;
+        particle.style.setProperty('--drift-x', `${-14 + Math.random() * 28}vw`);
+        particle.style.setProperty('--particle-scale', `${0.85 + Math.random() * 1.35}`);
+
+        // Short negative delays make many runes visible immediately.
+        particle.style.animationDelay = `${-Math.random() * 11}s`;
+        particle.style.animationDuration = `${12 + Math.random() * 8}s`;
 
         particlesContainer.appendChild(particle);
     }
